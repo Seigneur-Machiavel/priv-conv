@@ -164,7 +164,8 @@ if (localStorage.getItem('dark-mode') === "false") {
 
 //#region - WEBSOCKET
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const ws = new WebSocket(protocol + window.location.host);
+let ws_url = protocol + window.location.host; if (urlprefix != "") { ws_url += '/' + urlprefix; }
+const ws = new WebSocket(ws_url);
 
 ws.onmessage = async (message) => {
 	if (message.data == "pong") { return; }
