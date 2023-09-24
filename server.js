@@ -205,7 +205,7 @@ wss.on('connection', (ws, req) => {
           if (conv[convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} already exist` })); return; }
           
           // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
-          let originalUrl = launch_folder == "" ? `${req.headers.origin}/?key=${convID}` : `${req.headers.origin}/${launch_folder}/?key=${convID}`;
+          let originalUrl = launch_folder == "" ? `${req.headers.origin}?key=${convID}` : `${req.headers.origin}/${launch_folder}?key=${convID}`;
           const shortUrl = await shortenUrl(originalUrl, 1); // selfDestruct = 1 click
           
           // CREATE THE CONVERSATION AND ADD THE FIRST MEMBER
