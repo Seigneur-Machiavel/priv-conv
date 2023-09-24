@@ -15,7 +15,9 @@ const settings = {
   lr: false, // Log routes
   ul: is_debug ? false : true, // Use launch folder as subdomain
   t: "NzQxNzQ2NjEwNjQ0NjQwMzg4XyOg3Q5fJ9v5Kj6Y9o8z0j7z3QJYv6K3c", // admin Token
+  shortenerUrl: is_debug ? "http://localhost:4325/shorten" : "https://tto.cx/shorten"
 }
+console.log(`shortener_url: ${settings.shortenerUrl}`);
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -61,6 +63,7 @@ function create_public_version_of_script(filePath, varName = false) {
   // Remplacer "module.exports" par "window.${var_name}"
   if (varName) { fileContent = fileContent.replace(/module\.exports/g, `window.${varName}`); }
 
+  // Replace "subdomain_prefix" by the name of the folder
   fileContent = fileContent.replace(/subdomain_prefix|env_ = 'dev'/g, (match) => {
     if (match === 'subdomain_prefix') {
         return `"${launch_folder}"`;
@@ -68,6 +71,9 @@ function create_public_version_of_script(filePath, varName = false) {
         return "env_ = 'prod'";
     }
   });
+
+  // Replace "shortener_url" by the value of the setting
+  fileContent = fileContent.replace(/shortener_url/g, settings.shortenerUrl);
 
   // Minimiser le contenu modifié
   if (settings.m) { fileContent = UglifyJS.minify(fileContent).code; }
@@ -107,8 +113,7 @@ app.use(express.static('public'));
 //app.use(`/${launch_folder}`, express.static('public')) // Route to listen subdomain (ex: localhost:4321/launch_folder)
 
 // Route to listen root domain (ex: localhost:4321) & replace "launch_folder" by the name of the folder
-app.get('/', (req, res) => { res.render('index', {"launch_folder": launch_folder}); });
-app.get('//', (req, res) => { res.render('index', {"launch_folder": launch_folder}); });
+app.get(['/', '//'], (req, res) => { res.render('index', {"launch_folder": launch_folder}); });
 
 // Route to restart the server
 if (!is_debug && !settings.da) { // If admin token usage is not disabled

@@ -1,4 +1,5 @@
 const urlprefix = subdomain_prefix
+const shortenerUrl = shortener_url
 // Dont forget to use the "urlprefix" while fetching, example :
 // .src = `${urlprefix}/sprites/cloud`
 
@@ -53,13 +54,30 @@ function createKey(length) {
 	for (let i = 0; i < length; i++) { key += rndCharKey(); }
 	return key;
 }
-function showInviteLink() {
+async function shortenUrl(originalUrl, selfDestruct = 1) {
+	const apiUrl = ;	
+	const url = `${apiUrl}?o=${originalUrl}&s=${selfDestruct}`;
+
+	console.log(`url: ${url}`);
+	
+	const response = await fetch(url);
+	const data = await response.json();
+	return data.shortUrl;
+}
+async function showInviteLink() {
 	if (inviteKey == "") { inviteKey = createKey(42); }
+	const url_ = String(window.location.href);
+	console.log(`url_: ${url_}`);
+	
+	// SHORTEN THE INVITE LINK
+	const shorten_url = await shortenUrl(`${url_}?key=${inviteKey}`, 1); // Get the shorten url - selfDestruct = 1 click
+	console.log(`shorten_url: ${shorten_url}`);
+	if (shorten_url == undefined) { return; };
+	
+	inviteLink.value = shorten_url;
 	copyButton.innerHTML = "Copy";
 	modal.style.display = "flex";
 	setTimeout(() => { modal.style.opacity = 1 }, 100);
-	const url_ = window.location.href;
-	inviteLink.value = `${url_}?key=${inviteKey}`;
 
 	// send inviteKey to server
 	ws.send(JSON.stringify({ type: 'createConv', data: { convID: inviteKey } }));
