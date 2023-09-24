@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index</title>
+    <link rel="icon" href="<%= launch_folder %>/icon.webp" type="image/x-icon">
+    <link rel="stylesheet" href="<%= launch_folder %>/styles.css">
+    <script src="<%= launch_folder %>/scripts/script_1.js"></script>
+</head>
+
+<body class="dark-mode">
+    <div id="modal">
+        <div class="modal-content">
+            <h1 id="modal-title">Send this link to your friend</h1>
+            <input type="text" id="inviteLink"></input>
+            <button id="copyButton">Copy</button>
+        </div>
+    </div>
+
+    <div id="chat-wrap">
+        <div id="top-buttons">
+            <button id="invitButton">+ Invite</button>
+
+            <label class="switch">
+                <input type="checkbox" id="dark-mode-toggle" onclick="toggleDarkMode(this)" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div id="chatWindow" class="chat-window">
+            <p>Invite someone to chat with...</p>
+        </div>
+        
+        <div class="message-input">
+            <textarea id="message" placeholder="Your message"></textarea>
+            <button id="sendButton">&#9993;</button>
+            <!--<button id="clearButton">&#10006;</button>-->
+        </div>
+    </div>
+</body>
+
+</html>
