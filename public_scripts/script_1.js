@@ -19,6 +19,7 @@ window.addEventListener('load', async function () {
 
 //#region - HTML-ELEMENTS
 const modal = document.getElementById('modal');
+const remaining_time_value = document.getElementById('remaining-time-value');
 const inviteLink = document.getElementById('inviteLink');
 const copyButton = document.getElementById('copyButton');
 const invitButton = document.getElementById('invitButton');
@@ -32,7 +33,9 @@ const textarea = document.querySelector('textarea');
 //#region - VARIABLES
 let userID = null;
 let inviteKey = "";
+let shortUrl = "";
 let first_msg = true;
+let countDownStarted = false;
 // new URLSearchParams(window.location.search).get('key')
 if (window.location.search != "") {
 	const params = new URLSearchParams(window.location.search);
@@ -53,9 +56,9 @@ function createInviteKey(length = 42) {
 	for (let i = 0; i < length; i++) { key += rndCharKey(); }
 	return key;
 }
-function showInviteLink(inviteLink) {
-	inviteLink.value = inviteLink;
-	copyButton.innerHTML = "Copy";
+function showInviteLink(link = 'toto') {
+	inviteLink.value = link;
+	copyButton.innerText = "Copy";
 	modal.style.display = "flex";
 	setTimeout(() => { modal.style.opacity = 1 }, 100);
 }
@@ -63,7 +66,7 @@ function copyInviteLink() {
 	inviteLink.select();
 	inviteLink.setSelectionRange(0, 99999);
 	navigator.clipboard.writeText(inviteLink.value);
-	copyButton.innerHTML = "Copied !";
+	copyButton.innerText = "Copied !";
 }
 function sendMsg() {
 	const message = messageInput.value;
@@ -77,7 +80,7 @@ function sendMsg() {
 }
 function addInfoMessage(message) {
 	const messageElement = document.createElement('p');
-	messageElement.innerHTML = `Info : ${message}`
+	messageElement.innerText = `Info : ${message}`
 	chatWindow.appendChild(messageElement);
 }
 function addMessage(message, is_sender = false) {
@@ -90,12 +93,24 @@ function addMessage(message, is_sender = false) {
 	if (is_sender) { messageElement.classList.add('isSender'); }
 
 	const messageText = document.createElement('p');
-	messageText.innerHTML = message.replace(/\n/g, '<br>')
+	messageText.innerText = message.replace(/\n/g, '<br>')
 
 	messageElement.appendChild(messageText);
 	msgWrap.appendChild(messageElement);
 	chatWindow.appendChild(msgWrap);
 	chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+async function countDown(from_s) {
+	if (from_s == undefined) { return; }
+	countDownStarted = true;
+	// Set the remaining time clock to the remaining time formated as : 00:00
+	let remaining_s = from_s;
+	while (remaining_s > 0) {
+		remaining_time_value.innerText = `${Math.floor(remaining_s / 60)}:${remaining_s % 60 < 10 ? '0' + remaining_s % 60 : remaining_s % 60}`;
+		remaining_s--;
+		await new Promise(r => setTimeout(r, 1000));
+	}
+	remaining_time_value.innerText = `00:00`;
 }
 //#endregion
 
@@ -143,6 +158,9 @@ invitButton.addEventListener('click', function() {
 		inviteKey = createInviteKey();
 		// send inviteKey to server
 		ws.send(JSON.stringify({ type: 'createConv', data: { convID: inviteKey } }));
+	} else {
+		// show invite link
+		showInviteLink(shortUrl);
 	}
 });
 textarea.addEventListener('input', () => {
@@ -182,19 +200,22 @@ ws.onmessage = async (message) => {
 			shortUrl = d_.shortUrl;
 			console.log(`shortUrl: ${shortUrl}`);
 			showInviteLink(shortUrl);
+			if (!countDownStarted) { countDown(d_.remainingS); }
 			break;
 		case 'userID':
 			userID = d_;
 			console.log(`userID: ${userID}`);
 			break;
 		case 'startConv':
-			chatWindow.innerHTML = "";
-			addInfoMessage(d_);
-			console.log(d_);
+			chatWindow.innerText = "";
+			addInfoMessage(d_.infoMsg);
+			console.log(`startConv: ${d_.infoMsg}`);
+			if (!countDownStarted) { countDown(d_.remainingS); }
+			console.log(`remainingS: ${d_.remainingS}`);
 			break;
 		case 'newMsg':
-			if (first_msg) { first_msg = false; chatWindow.innerHTML = ""; }
-			addMessage(d_.msg, d_.userID == userID);
+			if (first_msg) { first_msg = false; chatWindow.innerText = ""; }
+			addMessage(String(d_.msg), d_.userID == userID);
 			break;
 		default:
 			break;

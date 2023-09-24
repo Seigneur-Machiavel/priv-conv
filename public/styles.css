@@ -20,6 +20,9 @@ body {
     overflow: hidden;
     margin: 0;
 }
+button {
+    cursor: pointer;
+}
 
 #modal {
     position: fixed;
@@ -57,6 +60,7 @@ body {
     border-radius: 10px;
     padding: 6px;
     margin: 30px 0;
+    text-align: center;
 }
 .modal-content button {
     height: fit-content !important;
@@ -71,7 +75,12 @@ body {
     flex-direction: column;
 }
 #top-buttons {
+    display: flex;
+    justify-content: flex-start;
     padding: 0 0 1vh 0;
+}
+.remaining-time {
+    margin-left: 40px;
 }
 .chat-window {
     height: 100%;

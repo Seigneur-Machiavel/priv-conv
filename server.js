@@ -15,7 +15,7 @@ const settings = {
   lr: false, // Log routes
   ul: is_debug ? false : true, // Use launch folder as subdomain
   t: "NzQxNzQ2NjEwNjQ0NjQwMzg4XyOg3Q5fJ9v5Kj6Y9o8z0j7z3QJYv6K3c", // admin Token
-  shortenerUrl: "https://tto.cx/shorten", // URL of the shortener API
+  shortenerUrl: "https://tto.cx", // URL of the shortener API
 }
 console.log(`shortener_url: ${settings.shortenerUrl}`);
 const args = process.argv.slice(2);
@@ -105,14 +105,23 @@ fs.readdirSync('./public_scripts').forEach(file => {
 
 //#region - SIMPLE FUNCTIONS
 async function shortenUrl(originalUrl, selfDestruct = 1) {
-	const apiUrl = settings.shortenerUrl;	
-	const url = `${apiUrl}?o=${originalUrl}&s=${selfDestruct}`;
+	const url = `${settings.shortenerUrl}/shorten?o=${originalUrl}&s=${selfDestruct}`;
 
 	console.log(`url to shorten: ${url}`);
 	
 	const response = await fetch(url);
 	const data = await response.json();
 	return data.shortUrl;
+}
+async function getShortenedUrlInfo(shortUrl) {
+  const shortUrlId = shortUrl.split('/').pop();
+  const url = `${settings.shortenerUrl}/info/${shortUrlId}`;
+
+  console.log(`url to get info: ${shortUrlId}`);
+  
+  const response = await fetch(url);
+  const data = await response.json();
+  return data;
 }
 //#endregion ----------------------------------------------
 
@@ -191,32 +200,42 @@ wss.on('connection', (ws, req) => {
 					ws.send(JSON.stringify({ type: 'log_msg', data: 'Hello from server' }));
 					break;
 				case 'createConv':
+          if (conv[d_.convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${d_.convID} already exist` })); return; }
           convID = d_.convID;
           if (conv[convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} already exist` })); return; }
           conv[convID] = { members: [ new convMember(0, ws, false) ] };
           conv_userID = 0;
 
-          // CREATE THE SHORTENED URL
+          // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
           const shortUrl = await shortenUrl(`${req.headers.origin}/?key=${convID}`, 1); // selfDestruct = 1 click
 
           // SEND userID TO CLIENT
-          ws.send(JSON.stringify({ type: 'createConv', data: { userID: conv_userID, shortUrl } }));
+          ws.send(JSON.stringify({ type: 'createConv', data: { userID: conv_userID, shortUrl, remainingS: 3600 } }));
           break;
         case 'joinConv':
+          if (typeof d_.convID !== 'string') { ws.send(JSON.stringify({ type: 'log_msg', data: `convID is not a string` })); return; }
           convID = d_.convID;
           if (conv[convID] == undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} not found` })); return; }
+          
+          // IF TWO MEMBERS ARE ALREADY CONNECTED
+          if (conv[convID].members.length >= 2) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} is full` })); return; }
+          
           conv[convID].members.push( new convMember(conv[convID].members.length, ws, false) );
           conv_userID = conv[convID].members.length - 1;
 
           // SEND userID TO CLIENT
           ws.send(JSON.stringify({ type: 'userID', data: conv_userID }));
 
+          // GET THE REMAINING TIME BEFORE THE CONVERSATION IS DELETED (in seconds)
+          const convInfo = await getShortenedUrlInfo(d_.convID);
+
           // SEND TO ALL MEMBERS OF THE CONVERSATION
           conv[convID].members.forEach(member => {
-            member.ws.send(JSON.stringify({ type: 'startConv', data: `Everyone is here !` }));
+            member.ws.send(JSON.stringify({ type: 'startConv', data: { remainingS: convInfo.remainingTime, infoMsg: `Everyone is here !`} }));
           });
           break;
         case 'newMsg':
+          if (typeof d_.msg !== 'string') { ws.send(JSON.stringify({ type: 'log_msg', data: `msg is not a string` })); return; }
           if (conv[convID] == undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} not found` })); return; }
           
           // SEND TO ALL MEMBERS OF THE CONVERSATION
