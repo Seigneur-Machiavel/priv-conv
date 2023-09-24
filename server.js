@@ -73,7 +73,7 @@ function create_public_version_of_script(filePath, varName = false) {
   });
 
   // Replace "shortener_url" by the value of the setting
-  fileContent = fileContent.replace(/shortener_url/g, settings.shortenerUrl);
+  fileContent = fileContent.replace(/shortener_url/g, `"${settings.shortenerUrl}"`);
 
   // Minimiser le contenu modifié
   if (settings.m) { fileContent = UglifyJS.minify(fileContent).code; }

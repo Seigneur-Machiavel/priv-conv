@@ -55,7 +55,7 @@ function createKey(length) {
 	return key;
 }
 async function shortenUrl(originalUrl, selfDestruct = 1) {
-	const apiUrl = ;	
+	const apiUrl = shortenerUrl;	
 	const url = `${apiUrl}?o=${originalUrl}&s=${selfDestruct}`;
 
 	console.log(`url: ${url}`);
