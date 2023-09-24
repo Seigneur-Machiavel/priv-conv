@@ -31,6 +31,7 @@ const textarea = document.querySelector('textarea');
 //#endregion
 
 //#region - VARIABLES
+const crypto = {pubKey: "", privKey: ""};
 let userID = null;
 let inviteKey = "";
 let shortUrl = "";
@@ -112,6 +113,32 @@ async function countDown(from_s) {
 	}
 	remaining_time_value.innerText = `00:00`;
 }
+//#endregion
+
+//#region - CRYPTOGRAPHIC FUNCTIONS
+const keyPair = await window.crypto.subtle.generateKey(
+	{
+		name: 'RSA-OAEP',
+		modulusLength: 2048,
+		publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+		hash: 'SHA-256',
+	},
+	true,
+	['encrypt', 'decrypt']
+);
+
+// Public key
+const exportedPublicKey = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
+crypto.pubKey = new Uint8Array(exportedPublicKey);
+
+// Private key
+const exportedPrivateKey = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+crypto.privKey = new Uint8Array(exportedPrivateKey);
+
+console.log('PubKey:', crypto.pubKey);
+console.log('PrivKey:', crypto.privKey);
+
+addMessage(`pubKey: ${crypto.pubKey}`)
 //#endregion
 
 //#region - EVENT LISTENERS

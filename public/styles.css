@@ -69,7 +69,7 @@ button {
 }
 
 #chat-wrap {
-    height: 98vh;
+    height: 86vh;
     padding: 1vh;
     display: flex;
     flex-direction: column;
