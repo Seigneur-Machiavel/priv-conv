@@ -167,7 +167,7 @@ function logRoutes() {
 //#region - WEBSOCKET
 const server  = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const conv = { toto: { members: [] } }; // conversations
+const conv = { toto: { members: [], shortUrlID: "25Ed" } }; // conversations
 class convMember {
   constructor(id, ws, key) {
     this.id = id;
@@ -203,11 +203,14 @@ wss.on('connection', (ws, req) => {
           if (conv[d_.convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${d_.convID} already exist` })); return; }
           convID = d_.convID;
           if (conv[convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} already exist` })); return; }
-          conv[convID] = { members: [ new convMember(0, ws, false) ] };
-          conv_userID = 0;
-
+          
           // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
-          const shortUrl = await shortenUrl(`${req.headers.origin}${launch_folder}/?key=${convID}`, 1); // selfDestruct = 1 click
+          let originalUrl = launch_folder == "" ? `${req.headers.origin}/?key=${convID}` : `${req.headers.origin}/${launch_folder}/?key=${convID}`;
+          const shortUrl = await shortenUrl(originalUrl, 1); // selfDestruct = 1 click
+          
+          // CREATE THE CONVERSATION AND ADD THE FIRST MEMBER
+          conv[convID] = { members: [ new convMember(0, ws, false) ], shortUrlID: shortUrl.split('/').pop() };
+          conv_userID = 0;
 
           // SEND userID TO CLIENT
           ws.send(JSON.stringify({ type: 'createConv', data: { userID: conv_userID, shortUrl, remainingS: 3600 } }));
@@ -220,6 +223,7 @@ wss.on('connection', (ws, req) => {
           // IF TWO MEMBERS ARE ALREADY CONNECTED
           if (conv[convID].members.length >= 2) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} is full` })); return; }
           
+          // ADD THE NEW MEMBER TO THE CONVERSATION
           conv[convID].members.push( new convMember(conv[convID].members.length, ws, false) );
           conv_userID = conv[convID].members.length - 1;
 
@@ -227,7 +231,7 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({ type: 'userID', data: conv_userID }));
 
           // GET THE REMAINING TIME BEFORE THE CONVERSATION IS DELETED (in seconds)
-          const convInfo = await getShortenedUrlInfo(d_.convID);
+          const convInfo = await getShortenedUrlInfo(conv[convID].shortUrlID);
 
           // SEND TO ALL MEMBERS OF THE CONVERSATION
           conv[convID].members.forEach(member => {
