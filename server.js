@@ -207,7 +207,7 @@ wss.on('connection', (ws, req) => {
           conv_userID = 0;
 
           // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
-          const shortUrl = await shortenUrl(`${req.headers.origin}/?key=${convID}`, 1); // selfDestruct = 1 click
+          const shortUrl = await shortenUrl(`${req.headers.origin}${launch_folder}/?key=${convID}`, 1); // selfDestruct = 1 click
 
           // SEND userID TO CLIENT
           ws.send(JSON.stringify({ type: 'createConv', data: { userID: conv_userID, shortUrl, remainingS: 3600 } }));
