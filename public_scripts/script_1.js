@@ -1,5 +1,4 @@
 const urlprefix = subdomain_prefix
-const shortenerUrl = shortener_url
 // Dont forget to use the "urlprefix" while fetching, example :
 // .src = `${urlprefix}/sprites/cloud`
 
@@ -49,38 +48,16 @@ function rndCharKey() {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	return chars[rnd(0, chars.length - 1)];
 }
-function createKey(length) {
+function createInviteKey(length = 42) {
 	let key = "";
 	for (let i = 0; i < length; i++) { key += rndCharKey(); }
 	return key;
 }
-async function shortenUrl(originalUrl, selfDestruct = 1) {
-	const apiUrl = shortenerUrl;	
-	const url = `${apiUrl}?o=${originalUrl}&s=${selfDestruct}`;
-
-	console.log(`url: ${url}`);
-	
-	const response = await fetch(url);
-	const data = await response.json();
-	return data.shortUrl;
-}
-async function showInviteLink() {
-	if (inviteKey == "") { inviteKey = createKey(42); }
-	const url_ = String(window.location.href);
-	console.log(`url_: ${url_}`);
-	
-	// SHORTEN THE INVITE LINK
-	const shorten_url = await shortenUrl(`${url_}?key=${inviteKey}`, 1); // Get the shorten url - selfDestruct = 1 click
-	console.log(`shorten_url: ${shorten_url}`);
-	if (shorten_url == undefined) { return; };
-	
-	inviteLink.value = shorten_url;
+function showInviteLink(inviteLink) {
+	inviteLink.value = inviteLink;
 	copyButton.innerHTML = "Copy";
 	modal.style.display = "flex";
 	setTimeout(() => { modal.style.opacity = 1 }, 100);
-
-	// send inviteKey to server
-	ws.send(JSON.stringify({ type: 'createConv', data: { convID: inviteKey } }));
 }
 function copyInviteLink() {
 	inviteLink.select();
@@ -162,7 +139,11 @@ copyButton.addEventListener('click', function() {
 	copyInviteLink();
 });
 invitButton.addEventListener('click', function() {
-	showInviteLink();
+	if (inviteKey == "") {
+		inviteKey = createInviteKey();
+		// send inviteKey to server
+		ws.send(JSON.stringify({ type: 'createConv', data: { convID: inviteKey } }));
+	}
 });
 textarea.addEventListener('input', () => {
 	// Reset height to 0 so the scrollHeight can be measured correctly
@@ -195,14 +176,21 @@ ws.onmessage = async (message) => {
 		case 'log_msg':
 			console.log(d_);
 			break;
-		case 'startConv':
-			chatWindow.innerHTML = "";
-			addInfoMessage(d_);
-			console.log(d_);
+		case 'createConv':
+			userID = d_.userID;
+			console.log(`userID: ${userID}`);
+			shortUrl = d_.shortUrl;
+			console.log(`shortUrl: ${shortUrl}`);
+			showInviteLink(shortUrl);
 			break;
 		case 'userID':
 			userID = d_;
 			console.log(`userID: ${userID}`);
+			break;
+		case 'startConv':
+			chatWindow.innerHTML = "";
+			addInfoMessage(d_);
+			console.log(d_);
 			break;
 		case 'newMsg':
 			if (first_msg) { first_msg = false; chatWindow.innerHTML = ""; }

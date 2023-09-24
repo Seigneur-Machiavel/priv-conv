@@ -15,7 +15,7 @@ const settings = {
   lr: false, // Log routes
   ul: is_debug ? false : true, // Use launch folder as subdomain
   t: "NzQxNzQ2NjEwNjQ0NjQwMzg4XyOg3Q5fJ9v5Kj6Y9o8z0j7z3QJYv6K3c", // admin Token
-  shortenerUrl: is_debug ? "http://localhost:4325/shorten" : "https://tto.cx/shorten"
+  shortenerUrl: "https://tto.cx/shorten", // URL of the shortener API
 }
 console.log(`shortener_url: ${settings.shortenerUrl}`);
 const args = process.argv.slice(2);
@@ -72,9 +72,6 @@ function create_public_version_of_script(filePath, varName = false) {
     }
   });
 
-  // Replace "shortener_url" by the value of the setting
-  fileContent = fileContent.replace(/shortener_url/g, `"${settings.shortenerUrl}"`);
-
   // Minimiser le contenu modifié
   if (settings.m) { fileContent = UglifyJS.minify(fileContent).code; }
 
@@ -104,6 +101,19 @@ function executeServerManagerScript(exec_args = "") {
 fs.readdirSync('./public_scripts').forEach(file => {
   if (file.endsWith('.js')) { create_public_version_of_script(`./public_scripts/${file}`); }
 });
+//#endregion ----------------------------------------------
+
+//#region - SIMPLE FUNCTIONS
+async function shortenUrl(originalUrl, selfDestruct = 1) {
+	const apiUrl = settings.shortenerUrl;	
+	const url = `${apiUrl}?o=${originalUrl}&s=${selfDestruct}`;
+
+	console.log(`url to shorten: ${url}`);
+	
+	const response = await fetch(url);
+	const data = await response.json();
+	return data.shortUrl;
+}
 //#endregion ----------------------------------------------
 
 //#region - HTTP SERVER - EXPRESS - ROUTES
@@ -182,11 +192,15 @@ wss.on('connection', (ws, req) => {
 					break;
 				case 'createConv':
           convID = d_.convID;
+          if (conv[convID] != undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} already exist` })); return; }
           conv[convID] = { members: [ new convMember(0, ws, false) ] };
           conv_userID = 0;
 
+          // CREATE THE SHORTENED URL
+          const shortUrl = await shortenUrl(`${req.headers.origin}/?key=${convID}`, 1); // selfDestruct = 1 click
+
           // SEND userID TO CLIENT
-          ws.send(JSON.stringify({ type: 'userID', data: conv_userID }));
+          ws.send(JSON.stringify({ type: 'createConv', data: { userID: conv_userID, shortUrl } }));
           break;
         case 'joinConv':
           convID = d_.convID;
@@ -233,9 +247,6 @@ wss.on('connection', (ws, req) => {
 //#endregion ----------------------------------------------
 
 // START SERVER
-/*app.listen(settings.p, () => {
-  console.log(`Server running on port ${settings.p}`);
-});*/
 server.listen(settings.p, () => {
 	const address = server.address();
 	console.log(`Server running and listening ${address.address}:${settings.p}`);
