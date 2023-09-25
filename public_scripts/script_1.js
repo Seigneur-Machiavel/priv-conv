@@ -269,6 +269,10 @@ sendButton.addEventListener('click', function() {
 });
 let shiftKey_pressed = false;
 messageInput.addEventListener('keydown', function(event) {
+	// Forbid "|" character in the message input
+	if (event.key === '|') {
+		event.preventDefault();
+	}
 	if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
 		shiftKey_pressed = true;
 	}
