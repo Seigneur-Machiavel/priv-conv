@@ -7,8 +7,28 @@
     <title>Index</title>
     <link rel="icon" href="<%= launch_folder %>/icon.webp" type="image/x-icon">
     <link rel="stylesheet" href="<%= launch_folder %>/styles.css">
-    <!--<script src="<%= launch_folder %>/scripts/sjcl.js"></script>-->
-    <script src="<%= launch_folder %>/scripts/script_1.js"></script>
+    <!-- <script src="<%= launch_folder %>/scripts/script_1.js"></script> -->
+    <script> // Here we load partial page and scripts
+        const scriptList = ["script_1"];
+        function loadScript(src, defer = true) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                if (defer) { script.defer = true; }
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        // Load all scripts
+        async function loadScripts() {
+            for (let i = 0; i < scriptList.length; i++) {
+                const scriptSrc = `<%= launch_folder %>/scripts/${scriptList[i]}.js`;
+                await loadScript(scriptSrc);
+            }
+        }
+        loadScripts();
+    </script>
 </head>
 
 <body class="dark-mode">

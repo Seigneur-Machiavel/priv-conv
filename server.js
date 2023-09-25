@@ -17,7 +17,7 @@ const settings = {
   t: "NzQxNzQ2NjEwNjQ0NjQwMzg4XyOg3Q5fJ9v5Kj6Y9o8z0j7z3QJYv6K3c", // admin Token
   shortenerUrl: "https://tto.cx", // URL of the shortener API
 }
-console.log(`shortener_url: ${settings.shortenerUrl}`);
+console.log(`shortener_urls: ${settings.shortenerUrl}`);
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -45,6 +45,7 @@ for (let i = 0; i < args.length; i++) {
 
 //#region - IMPORTS - MODULES - SCRIPTS PUBLIFICATION
 const launch_folder = settings.ul ? __dirname.split('\\').pop().split('/').pop() : "";
+if (settings.ul) { console.log(`launch_folder: ${launch_folder}`) }; // Get the name of the folder where the server is launched
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -52,8 +53,8 @@ const http = require('http');
 const WebSocket = require('ws');
 const UglifyJS = require('uglify-js');
 const { exec } = require('child_process');
+const axios = require('axios');
 //---------------------------------------------------------
-if (settings.ul) { console.log(`launch_folder: ${launch_folder}`) }; // Get the name of the folder where the server is launched
 let exit_task = ""; // Exit task to execute when the server is exiting
 
 function create_public_version_of_script(filePath, varName = false) {
@@ -104,24 +105,35 @@ fs.readdirSync('./public_scripts').forEach(file => {
 //#endregion ----------------------------------------------
 
 //#region - SIMPLE FUNCTIONS
-async function shortenUrl(originalUrl, selfDestruct = 1) {
-	const url = `${settings.shortenerUrl}/shorten?o=${originalUrl}&s=${selfDestruct}`;
-
-	console.log(`url to shorten: ${url}`);
-	
-	const response = await fetch(url);
-	const data = await response.json();
-	return data.shortUrl;
+async function shortenUrl(originalUrl, selfDestruct = 1) {  
+  // Try to shorten the url with each shortener url
+  const shortener_url = settings.shortenerUrl;
+  const url = `${shortener_url}/shorten`;
+  // console.log(`fetching: ${url}`);
+  try {
+    const response = await axios.get(url, {
+      params: {
+        o: originalUrl,
+        s: selfDestruct
+      }
+    });
+    return response.data.shortUrl;
+  } catch (error) {
+    console.log(`Error: ${error}`);
+  }
 }
 async function getShortenedUrlInfo(shortUrl) {
   const shortUrlId = shortUrl.split('/').pop();
   const url = `${settings.shortenerUrl}/info/${shortUrlId}`;
-
-  console.log(`url to get info: ${shortUrlId}`);
+  // console.log(`url to get info: ${shortUrlId}`);
   
-  const response = await fetch(url);
-  const data = await response.json();
-  return data;
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    console.log(`Error: ${error}`);
+    return null;
+  }
 }
 //#endregion ----------------------------------------------
 
@@ -207,6 +219,7 @@ wss.on('connection', (ws, req) => {
           // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
           let originalUrl = launch_folder == "" ? `${req.headers.origin}?key=${convID}` : `${req.headers.origin}/${launch_folder}?key=${convID}`;
           const shortUrl = await shortenUrl(originalUrl, 1); // selfDestruct = 1 click
+          if (!shortUrl) { ws.send(JSON.stringify({ type: 'log_msg', data: `Error while creating shortened url` })); return; }
           
           // CREATE THE CONVERSATION AND ADD THE FIRST MEMBER
           conv[convID] = { members: [ new convMember(0, ws, false) ], shortUrlID: shortUrl.split('/').pop() };
@@ -239,9 +252,13 @@ wss.on('connection', (ws, req) => {
           });
           break;
         case 'newMsg':
-          if (typeof d_.msg !== 'string') { ws.send(JSON.stringify({ type: 'log_msg', data: `msg is not a string` })); return; }
+          if (typeof d_.msg !== 'string') { 
+            console.log(`typeof d_.msg: ${typeof d_.msg}`);
+            ws.send(JSON.stringify({ type: 'log_msg', data: `msg is not a string` })); return; }
           if (conv[convID] == undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} not found` })); return; }
           
+          console.log(`msg_20_first_char: ${d_.msg.substring(0, 20)}`);
+
           // SEND TO ALL MEMBERS OF THE CONVERSATION
           conv[convID].members.forEach(member => {
             member.ws.send(JSON.stringify({ type: 'newMsg', data: { userID: conv_userID, msg: d_.msg } }));

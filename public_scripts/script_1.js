@@ -2,6 +2,43 @@ const urlprefix = subdomain_prefix
 // Dont forget to use the "urlprefix" while fetching, example :
 // .src = `${urlprefix}/sprites/cloud`
 
+//#region - CLASSES
+/**
+ * @class cryptoKeys
+ * @property {CryptoKeyPair} keyPair
+ * @property {Uint8Array} pubKey
+ * @property {Uint8Array} privKey
+ */
+class cryptoKeys {
+	constructor(keyPair, pubKey, privKey) {
+		this.keyPair = keyPair;
+		this.pubKey = pubKey;
+		this.privKey = privKey;
+	}
+}
+//#endregion
+
+//#region - VARIABLES
+let cryptInitStep = 0;
+let userKeys = null;
+let friendPubKey = "";
+let userID = null;
+let inviteKey = "";
+let shortUrl = "";
+let countDownStarted = false;
+let encrypted = '';
+let decrypted = '';
+let sentEncryptedMsg = {};
+if (window.location.search != "") {
+	const params = new URLSearchParams(window.location.search);
+	inviteKey = params.get('key');
+	// remove key from url
+	window.history.replaceState({}, document.title, window.location.pathname);
+}
+const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+//#endregion
+
+// THESES FUNCTIONS CAN BE CALLED FROM CHROME CONSOLE
 //#region - PRELOAD FUNCTIONS - ( They need to be created before html elements who use them )
 function toggleDarkMode(element) {
 	if (element.checked) {
@@ -10,13 +47,145 @@ function toggleDarkMode(element) {
 		document.body.classList.remove('dark-mode');
 	}
 }
+function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1) + min); }
+function rndCharKey() { return chars[rnd(0, chars.length - 1)]; }
+function createInviteKey(length = 42) {
+	let key = "";
+	for (let i = 0; i < length; i++) { key += rndCharKey(); }
+	return key;
+}
+//#endregion
+//#region - CRYPTOGRAPHIC FUNCTIONS
+// Generate RSA key pair
+async function generateRSAKeyPair() {
+	const keyPair = await window.crypto.subtle.generateKey(
+		{
+			name: 'RSA-OAEP',
+			modulusLength: 2048,
+			publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+			hash: 'SHA-256',
+		},
+		true,
+		['encrypt', 'decrypt']
+	);
+	return keyPair;
+}
+async function encryptMessage(string, publicKey) {
+	const importedPublicKey = await window.crypto.subtle.importKey(
+	  'spki',
+	  publicKey,
+	  {
+		name: 'RSA-OAEP',
+		hash: 'SHA-256',
+	  },
+	  false,
+	  ['encrypt']
+	);
+	
+	const encodedMessage = new TextEncoder().encode(string);
+	const encryptedData = await window.crypto.subtle.encrypt(
+	  {
+		name: 'RSA-OAEP',
+	  },
+	  importedPublicKey,
+	  encodedMessage
+	);
+	
+	const encryptedMessage = new Uint8Array(encryptedData);
+	return encryptedMessage;
+}
+async function decryptMessage(ArrayBuffer, privateKey) {
+	const importedPrivateKey = await window.crypto.subtle.importKey(
+	  'pkcs8',
+	  privateKey,
+	  {
+		name: 'RSA-OAEP',
+		hash: 'SHA-256',
+	  },
+	  false,
+	  ['decrypt']
+	);
+	
+	const decryptedData = await window.crypto.subtle.decrypt(
+	  {
+		name: 'RSA-OAEP',
+	  },
+	  importedPrivateKey,
+	  ArrayBuffer
+	);
+	
+	const decryptedMessage = new TextDecoder().decode(decryptedData);
+	return decryptedMessage;
+}
+function arrayBufferToString(ArrayBuffer) {
+	const uint8Array = new Uint8Array(ArrayBuffer)
+	return uint8Array.toString();
+}
+function StringToArrayBuffer(string) {
+	const array_ = string.split(',').map(Number);
+	return new Uint8Array(array_).buffer;
+}
+async function encryptMessageToString(string, publicKey) {
+	const MAX_PART_LENGTH = 190; // Longueur maximale d'une partie encryptée avec RSA-OAEP et une clé de 2048 bits
+  
+	const parts_str = [];
+	let remainingString = string;
+	
+	// Encrypt the message in parts to avoid the 245 bytes limitation
+	while (remainingString.length > 0) {
+		const part = remainingString.slice(0, MAX_PART_LENGTH);
+		// console.log(`part: ${part}`)
+		const encryptedPart = await encryptMessage(part, publicKey);
+		
+		const uint8Array = new Uint8Array(encryptedPart)
+		parts_str.push(uint8Array.toString());
+		remainingString = remainingString.slice(MAX_PART_LENGTH);
+	}
+
+	// Join the encrypted parts into a single string separated by a "|"
+	return parts_str.join('|');
+}
+async function decryptStringToString(string, privateKey) {
+	// Split the encrypted string into parts
+	const parts_str = string.split('|');
+
+	// Decrypt each part and join them into a single string
+	const decrypted_parts = [];
+	for (const part_str of parts_str) {
+		const part = part_str.split(',').map(Number);
+		const arrayBuffer = new Uint8Array(part).buffer;
+		const decryptedPart = await decryptMessage(arrayBuffer, privateKey);
+		decrypted_parts.push(decryptedPart);
+	}
+
+	return decrypted_parts.join('');
+}
+// MOUARF
+function compareArrayBuffers(buffer1, buffer2) {
+	const view1 = new Uint8Array(buffer1);
+	const view2 = new Uint8Array(buffer2);
+	
+	if (view1.length !== view2.length) {
+	  return false;
+	}
+	
+	for (let i = 0; i < view1.length; i++) {
+	  if (view1[i] !== view2[i]) {
+		return false;
+	  }
+	}
+	
+	return true;
+}
 //#endregion
 
+// THESES FUNCTIONS CANNOT BE CALLED FROM CHROME CONSOLE
 window.addEventListener('load', async function () {
-
-//#region - CLASSES
-//#endregion
-
+// GENERATE RSA KEY PAIR
+userKeys = new cryptoKeys( await generateRSAKeyPair() );
+userKeys.pubKey = await window.crypto.subtle.exportKey('spki', userKeys.keyPair.publicKey);
+userKeys.privKey = await window.crypto.subtle.exportKey('pkcs8', userKeys.keyPair.privateKey);
+// console.log(publicKeyToAlphanumeric(userKeys.pubKey))
 //#region - HTML-ELEMENTS
 const modal = document.getElementById('modal');
 const remaining_time_value = document.getElementById('remaining-time-value');
@@ -30,33 +199,7 @@ const chatWindow = document.getElementById('chatWindow');
 const textarea = document.querySelector('textarea');
 //#endregion
 
-//#region - VARIABLES
-const crypto = {pubKey: "", privKey: ""};
-let userID = null;
-let inviteKey = "";
-let shortUrl = "";
-let first_msg = true;
-let countDownStarted = false;
-// new URLSearchParams(window.location.search).get('key')
-if (window.location.search != "") {
-	const params = new URLSearchParams(window.location.search);
-	inviteKey = params.get('key');
-	// remove key from url
-	window.history.replaceState({}, document.title, window.location.pathname);
-}
-//#endregion
-
-//#region - SIMPLE FUNCTIONS
-function rnd(min, max) { return Math.floor(Math.random() * (max - min + 1) + min); }
-function rndCharKey() {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	return chars[rnd(0, chars.length - 1)];
-}
-function createInviteKey(length = 42) {
-	let key = "";
-	for (let i = 0; i < length; i++) { key += rndCharKey(); }
-	return key;
-}
+//#region - HTML RELATED FUNCTIONS
 function showInviteLink(link = 'toto') {
 	inviteLink.value = link;
 	copyButton.innerText = "Copy";
@@ -69,13 +212,14 @@ function copyInviteLink() {
 	navigator.clipboard.writeText(inviteLink.value);
 	copyButton.innerText = "Copied !";
 }
-function sendMsg() {
+async function sendMsg() {
 	const message = messageInput.value;
 	if (message == "") { return; }
-	// console.log(`sendMsg: ${message}`);
+	const encrypted_msg = await encryptMessageToString(message, friendPubKey);
+	sentEncryptedMsg[encrypted_msg] = message;
 
 	// Send message to server
-	ws.send(JSON.stringify({ type: 'newMsg', data: { msg: message } }));
+	ws.send(JSON.stringify({ type: 'newMsg', data: { msg: encrypted_msg } }));
 
 	messageInput.value = '';
 }
@@ -113,32 +257,6 @@ async function countDown(from_s) {
 	}
 	remaining_time_value.innerText = `00:00`;
 }
-//#endregion
-
-//#region - CRYPTOGRAPHIC FUNCTIONS
-const keyPair = await window.crypto.subtle.generateKey(
-	{
-		name: 'RSA-OAEP',
-		modulusLength: 2048,
-		publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-		hash: 'SHA-256',
-	},
-	true,
-	['encrypt', 'decrypt']
-);
-
-// Public key
-const exportedPublicKey = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
-crypto.pubKey = new Uint8Array(exportedPublicKey);
-
-// Private key
-const exportedPrivateKey = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-crypto.privKey = new Uint8Array(exportedPrivateKey);
-
-console.log('PubKey:', crypto.pubKey);
-console.log('PrivKey:', crypto.privKey);
-
-addMessage(`pubKey: ${crypto.pubKey}`)
 //#endregion
 
 //#region - EVENT LISTENERS
@@ -212,6 +330,7 @@ let ws_url = protocol + window.location.host; if (urlprefix != "") { ws_url += '
 const ws = new WebSocket(ws_url);
 
 ws.onmessage = async (message) => {
+	//try{
 	if (message.data == "pong") { return; }
     const data = JSON.parse(message.data);
 	const d_ = data.data;
@@ -239,14 +358,64 @@ ws.onmessage = async (message) => {
 			console.log(`startConv: ${d_.infoMsg}`);
 			if (!countDownStarted) { countDown(d_.remainingS); }
 			console.log(`remainingS: ${d_.remainingS}`);
+
+			// If user created the conversation, send his public key to the contact
+			if (userID === 0) { ws.send(JSON.stringify({ type: 'newMsg', data: { msg: arrayBufferToString(userKeys.pubKey) } })); }
 			break;
 		case 'newMsg':
-			if (first_msg) { first_msg = false; chatWindow.innerText = ""; }
-			addMessage(String(d_.msg), d_.userID == userID);
+			modal.style.opacity = 0;
+			
+			// Initialize cryptographic conversation
+			if (cryptInitStep === 0 && userID !== d_.userID) {
+				console.log(`0- clear key received`)
+				friendPubKey = StringToArrayBuffer(d_.msg);
+				// Send own public key encrypted with friend public key to contact
+				encrypted = await encryptMessageToString(arrayBufferToString(userKeys.pubKey), friendPubKey);
+				ws.send(JSON.stringify({ type: 'newMsg', data: { msg: encrypted } }));
+				console.log(`Send own public key encrypted with friend public key to contact`)
+			}
+			if (cryptInitStep === 1 && userID !== d_.userID) {
+				console.log(`1- encrypted key received`)// : ${d_.msg}`)
+				decrypted = await decryptStringToString(d_.msg, userKeys.privKey);
+				friendPubKey = StringToArrayBuffer(decrypted);
+				console.log(`1- friendPubKey decrypted`)
+
+				// Generate new RSA key pair
+				userKeys = new cryptoKeys( await generateRSAKeyPair() );
+				userKeys.pubKey = await window.crypto.subtle.exportKey('spki', userKeys.keyPair.publicKey);
+				userKeys.privKey = await window.crypto.subtle.exportKey('pkcs8', userKeys.keyPair.privateKey);
+
+				// Send own public key encrypted with friend public key to contact
+				encrypted = await encryptMessageToString(arrayBufferToString(userKeys.pubKey), friendPubKey);
+				ws.send(JSON.stringify({ type: 'newMsg', data: { msg: encrypted } }));
+				console.log(`Send own public key encrypted with friend public key to contact`)
+			}
+			if (cryptInitStep === 2 && userID !== d_.userID) {
+				console.log(`2- encrypted key received`)// : ${d_.msg}`)
+				decrypted = await decryptStringToString(d_.msg, userKeys.privKey);
+				friendPubKey = StringToArrayBuffer(decrypted);
+				console.log(`2- friendPubKey received`)
+			}
+			if (cryptInitStep === 2) { chatWindow.innerText = ""; addInfoMessage(`Conversation is now encrypted`); }
+			if (cryptInitStep <= 2) { cryptInitStep++; break; }
+
+			// Check if message is sent by the user
+			if (sentEncryptedMsg[d_.msg] != undefined) {
+				addMessage(sentEncryptedMsg[d_.msg], true);
+				delete sentEncryptedMsg[d_.msg];
+				break;
+			}
+
+			// if not sent by the user, decrypt the message and add it to the chat window
+			decrypted = await decryptStringToString(String(d_.msg), userKeys.privKey);
+			addMessage(decrypted, d_.userID == userID);
 			break;
 		default:
 			break;
 	}
+	//} catch (error) {
+	//	console.error(error);
+	//}
 };
 ws.onopen = async () => {
 	console.log('Socket opened');
