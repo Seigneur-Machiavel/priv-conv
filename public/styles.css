@@ -17,7 +17,6 @@ body {
     font-family: monospace;
     background-color: var(--background-color);
     color: var(--text-color);
-    overflow: hidden;
     margin: 0;
 }
 button {
@@ -90,6 +89,7 @@ button {
     margin-bottom: 10px;
     scrollbar-width: thin;
     scrollbar-color: #999 transparent;
+    word-wrap: break-word;
 }
 .chat-window::-webkit-scrollbar {
     width: 8px;

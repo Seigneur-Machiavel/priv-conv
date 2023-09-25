@@ -108,15 +108,11 @@ fs.readdirSync('./public_scripts').forEach(file => {
 async function shortenUrl(originalUrl, selfDestruct = 1) {  
   // Try to shorten the url with each shortener url
   const shortener_url = settings.shortenerUrl;
-  const url = `${shortener_url}/shorten`;
-  // console.log(`fetching: ${url}`);
+  // const url = `${shortener_url}/shorten`;
+  const url = `${shortener_url}/shorten?o=${originalUrl}&s=${selfDestruct}`;
+  console.log(`fetching: ${url}`);
   try {
-    const response = await axios.get(url, {
-      params: {
-        o: originalUrl,
-        s: selfDestruct
-      }
-    });
+    const response = await axios.get(url);
     return response.data.shortUrl;
   } catch (error) {
     console.log(`Error: ${error}`);
@@ -126,7 +122,6 @@ async function getShortenedUrlInfo(shortUrl) {
   const shortUrlId = shortUrl.split('/').pop();
   const url = `${settings.shortenerUrl}/info/${shortUrlId}`;
   // console.log(`url to get info: ${shortUrlId}`);
-  
   try {
     const response = await axios.get(url);
     return response.data;
@@ -218,7 +213,7 @@ wss.on('connection', (ws, req) => {
           
           // CREATE THE SHORTENED URL - Default expiration is 3600s (1h)
           let originalUrl = launch_folder == "" ? `${req.headers.origin}?key=${convID}` : `${req.headers.origin}/${launch_folder}?key=${convID}`;
-          const shortUrl = await shortenUrl(originalUrl, 1); // selfDestruct = 1 click
+          const shortUrl = is_debug ? originalUrl : await shortenUrl(originalUrl, 1); // selfDestruct = 1 click
           if (!shortUrl) { ws.send(JSON.stringify({ type: 'log_msg', data: `Error while creating shortened url` })); return; }
           
           // CREATE THE CONVERSATION AND ADD THE FIRST MEMBER
@@ -244,7 +239,7 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({ type: 'userID', data: conv_userID }));
 
           // GET THE REMAINING TIME BEFORE THE CONVERSATION IS DELETED (in seconds)
-          const convInfo = await getShortenedUrlInfo(conv[convID].shortUrlID);
+          const convInfo = is_debug ? 3600 : await getShortenedUrlInfo(conv[convID].shortUrlID);
 
           // SEND TO ALL MEMBERS OF THE CONVERSATION
           conv[convID].members.forEach(member => {
@@ -252,12 +247,10 @@ wss.on('connection', (ws, req) => {
           });
           break;
         case 'newMsg':
-          if (typeof d_.msg !== 'string') { 
-            console.log(`typeof d_.msg: ${typeof d_.msg}`);
-            ws.send(JSON.stringify({ type: 'log_msg', data: `msg is not a string` })); return; }
+          if (typeof d_.msg !== 'string') { console.log(`typeof d_.msg: ${typeof d_.msg}`); ws.send(JSON.stringify({ type: 'log_msg', data: `msg is not a string` })); return; }
           if (conv[convID] == undefined) { ws.send(JSON.stringify({ type: 'log_msg', data: `Conversation ${convID} not found` })); return; }
           
-          console.log(`msg_20_first_char: ${d_.msg.substring(0, 20)}`);
+          // console.log(`msg_20_first_char: ${d_.msg.substring(0, 20)}`);
 
           // SEND TO ALL MEMBERS OF THE CONVERSATION
           conv[convID].members.forEach(member => {

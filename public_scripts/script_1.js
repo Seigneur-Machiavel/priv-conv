@@ -54,6 +54,11 @@ function createInviteKey(length = 42) {
 	for (let i = 0; i < length; i++) { key += rndCharKey(); }
 	return key;
 }
+function sanitizeMessage(message) {
+    const sanitizedMessage = message.replace(/<\/?[^>]+(>|$)/g, '');
+    
+    return sanitizedMessage;
+}
 //#endregion
 //#region - CRYPTOGRAPHIC FUNCTIONS
 // Generate RSA key pair
@@ -238,7 +243,9 @@ function addMessage(message, is_sender = false) {
 	if (is_sender) { messageElement.classList.add('isSender'); }
 
 	const messageText = document.createElement('p');
-	messageText.innerText = message.replace(/\n/g, '<br>')
+	const sanitizedMessage = sanitizeMessage(message);
+    messageText.innerHTML = sanitizedMessage.replace(/\n/g, '<br>');
+	//messageText.innerText = message.replace(/\n/g, '<br>')
 
 	messageElement.appendChild(messageText);
 	msgWrap.appendChild(messageElement);
