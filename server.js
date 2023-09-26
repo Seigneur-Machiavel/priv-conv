@@ -16,6 +16,7 @@ const settings = {
   ul: is_debug ? false : true, // Use launch folder as subdomain
   t: "NzQxNzQ2NjEwNjQ0NjQwMzg4XyOg3Q5fJ9v5Kj6Y9o8z0j7z3QJYv6K3c", // admin Token
   shortenerUrl: "https://tto.cx", // URL of the shortener API
+  cp: false, // Custom path
 }
 console.log(`shortener_urls: ${settings.shortenerUrl}`);
 const args = process.argv.slice(2);
@@ -44,7 +45,8 @@ for (let i = 0; i < args.length; i++) {
 //#endregion ----------------------------------------------
 
 //#region - IMPORTS - MODULES - SCRIPTS PUBLIFICATION
-const launch_folder = settings.ul ? __dirname.split('\\').pop().split('/').pop() : "";
+let launch_folder = settings.ul ? __dirname.split('\\').pop().split('/').pop() : "";
+if (settings.sp) { launch_folder = settings.sp; } // Custom path (sp)
 if (settings.ul) { console.log(`launch_folder: ${launch_folder}`) }; // Get the name of the folder where the server is launched
 const fs = require('fs');
 const path = require('path');
